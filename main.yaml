@@ -8,6 +8,17 @@
         update_cache: yes
         upgrade: yes
 
+    - name: Install essential packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - git
+        - openjdk-17-jdk
+        - maven
+        - postgresql
+        - postgresql-contrib
+
     - name: Create hng user with sudo privileges
       user:
         name: hng
@@ -30,38 +41,30 @@
         force: yes
       become_user: hng
 
-    - name: Install PostgreSQL
-      apt:
-        name: postgresql
-        state: present
+    - name: Configure PostgreSQL
+      block:
+        - name: Ensure PostgreSQL service is running
+          service:
+            name: postgresql
+            state: started
+            enabled: yes
 
-    - name: Save PostgreSQL credentials to /var/secrets/pg_pw.txt
-      copy:
-        content: |
-          POSTGRES_USER=admin
-          POSTGRES_PASSWORD=yourpassword
-        dest: /var/secrets/pg_pw.txt
-        owner: postgres
-        group: postgres
-        mode: '0600'
+        - name: Save PostgreSQL credentials to /var/secrets/pg_pw.txt
+          copy:
+            content: |
+              POSTGRES_USER=admin
+              POSTGRES_PASSWORD=yourpassword
+            dest: /var/secrets/pg_pw.txt
+            owner: postgres
+            group: postgres
+            mode: '0600'
 
-    - name: Install RabbitMQ
-      apt:
-        name: rabbitmq-server
-        state: present
-
-    - name: Install Java and other dependencies
-      apt:
-        name: "{{ item }}"
-        state: present
-      loop:
-        - openjdk-17-jdk
-        - maven
-        - git
-        - curl
-        - zip
-        - unzip
-        - nginx
+        - name: Set up PostgreSQL database
+          become_user: postgres
+          shell: |
+            psql -c "CREATE DATABASE hng_db;"
+            psql -c "CREATE USER admin WITH ENCRYPTED PASSWORD 'yourpassword';"
+            psql -c "GRANT ALL PRIVILEGES ON DATABASE hng_db TO admin;"
 
     - name: Set up Nginx
       apt:
@@ -83,10 +86,16 @@
       notify:
         - Restart Nginx
 
-    - name: Ensure application starts on 127.0.0.1:3000
+    - name: Build the application using Maven
       shell: |
         cd /opt/stage_5b
-        nohup mvn spring-boot:run > /var/log/stage_5b/out.log 2> /var/log/stage_5b/error.log &
+        ./mvnw clean install
+      become_user: hng
+
+    - name: Run the application
+      shell: |
+        cd /opt/stage_5b
+        nohup java -jar target/your-app.jar > /var/log/stage_5b/out.log 2> /var/log/stage_5b/error.log &
       become_user: hng
 
     - name: Ensure /var/log/stage_5b exists
@@ -102,6 +111,12 @@
         recurse: yes
         owner: hng
         group: hng
+
+    - name: Run application tests using Maven
+      shell: |
+        cd /opt/stage_5b
+        ./mvnw test
+      become_user: hng
 
   handlers:
     - name: Restart Nginx
