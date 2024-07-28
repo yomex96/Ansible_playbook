@@ -88,19 +88,18 @@
       copy:
         content: |
           POSTGRES_USER=admin
-          POSTGRES_PASSWORD=hng
+          POSTGRES_PASSWORD=yourpassword
         dest: /var/secrets/pg_pw.txt
         owner: postgres
         group: postgres
         mode: '0600'
 
     - name: Set up PostgreSQL database
-      become: true
-      become_user: postgres
+      become: false
       shell: |
-        psql -c "CREATE DATABASE hng_db;"
-        psql -c "CREATE USER admin WITH ENCRYPTED PASSWORD 'hng';"
-        psql -c "GRANT ALL PRIVILEGES ON DATABASE hng_db TO admin;"
+        sudo -u postgres psql -c "CREATE DATABASE hng_db;"
+        sudo -u postgres psql -c "CREATE USER admin WITH ENCRYPTED PASSWORD 'yourpassword';"
+        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE hng_db TO admin;"
 
     - name: Set up Nginx
       apt:
