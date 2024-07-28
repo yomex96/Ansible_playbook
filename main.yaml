@@ -1,4 +1,3 @@
----
 - name: Setup Java Boilerplate Application
   hosts: hng
   become: yes
@@ -18,6 +17,7 @@
         - maven
         - postgresql
         - postgresql-contrib
+        - rabbitmq-server
 
     - name: Create hng user with sudo privileges
       user:
@@ -26,6 +26,14 @@
         append: yes
         create_home: yes
 
+    - name: Grant hng user sudo without password
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^hng'
+        line: 'hng ALL=(ALL) NOPASSWD:ALL'
+        validate: 'visudo -cf %s'
+
     - name: Create /opt/stage_5b directory
       file:
         path: /opt/stage_5b
@@ -33,38 +41,47 @@
         owner: hng
         group: hng
 
-    - name: Clone the repository into /opt/stage_5b
+    - name: Clone the repository into /opt/stage_5b as root
       git:
         repo: https://github.com/hngprojects/hng_boilerplate_java_web
         dest: /opt/stage_5b
         version: DevOps
         force: yes
+
+    - name: Change ownership of /opt/stage_5b to hng
+      file:
+        path: /opt/stage_5b
+        state: directory
+        owner: hng
+        group: hng
+        recurse: yes
+
+    - name: Mark /opt/stage_5b as a safe directory for Git
       become_user: hng
+      shell: git config --global --add safe.directory /opt/stage_5b
 
-    - name: Configure PostgreSQL
-      block:
-        - name: Ensure PostgreSQL service is running
-          service:
-            name: postgresql
-            state: started
-            enabled: yes
+    - name: Ensure PostgreSQL service is running
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
 
-        - name: Save PostgreSQL credentials to /var/secrets/pg_pw.txt
-          copy:
-            content: |
-              POSTGRES_USER=admin
-              POSTGRES_PASSWORD=yourpassword
-            dest: /var/secrets/pg_pw.txt
-            owner: postgres
-            group: postgres
-            mode: '0600'
+    - name: Save PostgreSQL credentials to /var/secrets/pg_pw.txt
+      copy:
+        content: |
+          POSTGRES_USER=admin
+          POSTGRES_PASSWORD=yourpassword
+        dest: /var/secrets/pg_pw.txt
+        owner: postgres
+        group: postgres
+        mode: '0600'
 
-        - name: Set up PostgreSQL database
-          become_user: postgres
-          shell: |
-            psql -c "CREATE DATABASE hng_db;"
-            psql -c "CREATE USER admin WITH ENCRYPTED PASSWORD 'yourpassword';"
-            psql -c "GRANT ALL PRIVILEGES ON DATABASE hng_db TO admin;"
+    - name: Set up PostgreSQL database
+      become_user: postgres
+      shell: |
+        psql -c "CREATE DATABASE hng_db;"
+        psql -c "CREATE USER admin WITH ENCRYPTED PASSWORD 'yourpassword';"
+        psql -c "GRANT ALL PRIVILEGES ON DATABASE hng_db TO admin;"
 
     - name: Set up Nginx
       apt:
