@@ -70,28 +70,36 @@
       args:
         chdir: /opt/stage_5b
 
-
     - name: Ensure PostgreSQL service is running
       service:
         name: postgresql
         state: started
         enabled: yes
 
+    - name: Create /var/secrets directory
+      file:
+        path: /var/secrets
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: '0700'
+
     - name: Save PostgreSQL credentials to /var/secrets/pg_pw.txt
       copy:
         content: |
           POSTGRES_USER=admin
-          POSTGRES_PASSWORD=yourpassword
+          POSTGRES_PASSWORD=hng
         dest: /var/secrets/pg_pw.txt
         owner: postgres
         group: postgres
         mode: '0600'
 
     - name: Set up PostgreSQL database
+      become: true
       become_user: postgres
       shell: |
         psql -c "CREATE DATABASE hng_db;"
-        psql -c "CREATE USER admin WITH ENCRYPTED PASSWORD 'yourpassword';"
+        psql -c "CREATE USER admin WITH ENCRYPTED PASSWORD 'hng';"
         psql -c "GRANT ALL PRIVILEGES ON DATABASE hng_db TO admin;"
 
     - name: Set up Nginx
