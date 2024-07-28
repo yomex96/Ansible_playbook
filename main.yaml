@@ -114,10 +114,9 @@
         - Restart Nginx
 
     - name: Enable Nginx site
-      file:
-        src: /etc/nginx/sites-available/stage_5b
-        dest: /etc/nginx/sites-enabled/
-        state: link
+      command: ln -s /etc/nginx/sites-available/stage_5b /etc/nginx/sites-enabled/
+      args:
+        removes: /etc/nginx/sites-enabled/stage_5b
       notify:
         - Restart Nginx
 
