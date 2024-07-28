@@ -1,5 +1,5 @@
 - name: Setup Java Boilerplate Application
-  hosts: hng
+  hosts: all
   become: yes
   tasks:
     - name: Update and upgrade apt packages
@@ -25,6 +25,8 @@
         groups: sudo
         append: yes
         create_home: yes
+        home: /home/hng
+        shell: /bin/bash
 
     - name: Grant hng user sudo without password
       lineinfile:
@@ -34,19 +36,27 @@
         line: 'hng ALL=(ALL) NOPASSWD:ALL'
         validate: 'visudo -cf %s'
 
-    - name: Create /opt/stage_5b directory
+    - name: Create the /opt/stage_5b directory
       file:
         path: /opt/stage_5b
         state: directory
         owner: hng
         group: hng
+        mode: '0755'
 
-    - name: Clone the repository into /opt/stage_5b as root
+    - name: Clone the repository into /opt/stage_5b as hng
+      become: yes
+      become_user: hng
       git:
-        repo: https://github.com/hngprojects/hng_boilerplate_java_web
-        dest: /opt/stage_5b
-        version: DevOps
-        force: yes
+       repo: https://github.com/hngprojects/hng_boilerplate_java_web
+       dest: /opt/stage_5b
+       version: DevOps
+       force: yes
+
+    - name: Add /opt/stage_5b to Git safe directories for hng
+      become: yes
+      become_user: hng
+      command: git config --global --add safe.directory /opt/stage_5b
 
     - name: Change ownership of /opt/stage_5b to hng
       file:
@@ -56,9 +66,6 @@
         group: hng
         recurse: yes
 
-    - name: Mark /opt/stage_5b as a safe directory for Git
-      become_user: hng
-      shell: git config --global --add safe.directory /opt/stage_5b
 
     - name: Ensure PostgreSQL service is running
       service:
