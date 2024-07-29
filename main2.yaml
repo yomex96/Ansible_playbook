@@ -135,18 +135,14 @@
         owner: hng
         group: hng
 
-    - name: Remove the target directory if it exists
-      file:
-        path: /opt/stage_5b/target
-        state: absent
-
 
 
     - name: Build the application using Maven
       shell: |
         cd /opt/stage_5b
-        ./mvnw clean install -e
-      become: true
+        ./mvnw clean install
+      become: false
+      become_user: hng
 
     - name: Run the application
       shell: |
