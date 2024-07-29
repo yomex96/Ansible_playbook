@@ -70,6 +70,14 @@
       args:
         chdir: /opt/stage_5b
 
+    - name: Resolve Maven dependencies
+      shell: mvn dependency:resolve
+      args:
+        chdir: /opt/stage_5b
+      become: false
+      become_user: hng
+
+
     - name: Ensure PostgreSQL service is running
       service:
         name: postgresql
