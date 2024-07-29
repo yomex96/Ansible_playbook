@@ -1,4 +1,3 @@
-## Overview: You will be assigned one of the 7 boilerplates from Stage 4.
 
 ## Project Based Task: Automated Deployment and Configuration with Ansible for Boilerplates
 
