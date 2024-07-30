@@ -1,5 +1,5 @@
 - name: Setup Java Boilerplate Application
-  hosts: all
+  hosts: hng
   become: yes
   become_flags: '-H'
   tasks:
