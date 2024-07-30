@@ -19,6 +19,7 @@
         - postgresql
         - postgresql-contrib
         - rabbitmq-server
+        - nginx
 
     - name: Create hng user with sudo privileges
       user:
@@ -47,6 +48,7 @@
 
     - name: Add /opt/stage_5b to Git safe directories for hng
       become: false
+      become_user: hng
       command: git config --global --add safe.directory /opt/stage_5b
 
     - name: Ensure the correct ownership of the directory before git operations
@@ -57,12 +59,14 @@
         recurse: yes
 
     - name: Clean repository if exists
+      become: true
       command: sudo -u hng git reset --hard HEAD
       args:
         chdir: /opt/stage_5b
       ignore_errors: yes
 
     - name: Fetch latest changes from remote
+      become: true
       command: sudo -u hng git fetch https://github.com/hngprojects/hng_boilerplate_java_web
       args:
         chdir: /opt/stage_5b
@@ -103,11 +107,6 @@
         sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE hng_db TO admin;"
       become: no
 
-    - name: Install Nginx
-      apt:
-        name: nginx
-        state: present
-
     - name: Configure Nginx as a reverse proxy
       template:
         src: nginx.conf.j2
@@ -136,17 +135,38 @@
         path: /opt/stage_5b/target
         state: absent
 
-    - name: Build the application using Maven (skip if not required)
-      shell: mvn dependency:resolve
+    - name: Ensure Java JDK is installed
+      apt:
+        name: openjdk-17-jdk
+        state: present
+
+    - name: Set JAVA_HOME environment variable for current session
+      lineinfile:
+        path: /home/hng/.bashrc
+        line: "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64"
+        create: yes
+        state: present
+
+    - name: Add JAVA_HOME to PATH in .bashrc
+      lineinfile:
+        path: /home/hng/.bashrc
+        line: "export PATH=$JAVA_HOME/bin:$PATH"
+        create: yes
+        state: present
+
+    - name: Build the application using Maven
+      shell: |
+        export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+        export PATH=$JAVA_HOME/bin:$PATH
+        mvn clean install -X
       args:
         chdir: /opt/stage_5b
-      become: true
 
-    - name: Run the application using Maven Spring Boot
+    - name: Run the application
       shell: |
         cd /opt/stage_5b
-        nohup mvn spring-boot:run > /var/log/stage_5b/out.log 2> /var/log/stage_5b/error.log &
-      become: true
+        nohup java -jar target/your-app.jar > /var/log/stage_5b/out.log 2> /var/log/stage_5b/error.log &
+      become_user: hng
 
     - name: Ensure logs are owned by hng
       file:
@@ -156,10 +176,10 @@
         group: hng
 
     - name: Run application tests using Maven
-      shell: mvn test
-      args:
-        chdir: /opt/stage_5b
-      become: true
+      shell: |
+        cd /opt/stage_5b
+        ./mvnw test
+      become_user: hng
 
   handlers:
     - name: Restart Nginx
